@@ -1,15 +1,17 @@
 {
-  "fill" : "automatic",
+  "fill" : {
+    "automatic-gradient" : "srgb:0.92157,0.12549,0.30196,1.00000"
+  },
   "groups" : [
     {
       "layers" : [
         {
-          "glass" : true,
+          "glass" : false,
           "hidden" : false,
           "image-name" : "Image Layer.png",
           "name" : "Image Layer",
           "position" : {
-            "scale" : 1.1,
+            "scale" : 0.66,
             "translation-in-points" : [
               0,
               0
@@ -22,7 +24,7 @@
         "opacity" : 0.5
       },
       "translucency" : {
-        "enabled" : true,
+        "enabled" : false,
         "value" : 0.5
       }
     }

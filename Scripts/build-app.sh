@@ -14,6 +14,8 @@ CONF=${1:-release}
 SIGNING_MODE=${KASET_SIGNING:-dev}
 SKIP_MAIN_ASSETS=${KASET_SKIP_MAIN_ASSETS:-0}
 APP_NAME="Kaset"
+# Name shown in the Dock, menu bar and Finder; the executable and bundle stay "Kaset".
+DISPLAY_NAME="YouTube Koski Player"
 RELEASE_BUNDLE_ID="com.sertacozercan.Kaset"
 # Debug bundles get their own sandbox container, so they never share the release
 # app's WebKit cookie jar, saved sign-in data, or preferences.
@@ -606,9 +608,9 @@ ${APP_LOCALIZATIONS_PLIST}
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
-    <string>${APP_NAME}</string>
+    <string>${DISPLAY_NAME}</string>
     <key>CFBundleDisplayName</key>
-    <string>${APP_NAME}</string>
+    <string>${DISPLAY_NAME}</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
@@ -642,16 +644,17 @@ ${APP_LOCALIZATIONS_PLIST}
     </array>
 
     <!-- Sparkle Auto-Update Configuration -->
+    <!-- Personal fork: never pull upstream releases over local changes. -->
     <key>SUFeedURL</key>
-    <string>https://raw.githubusercontent.com/sozercan/kaset/main/appcast.xml</string>
+    <string>https://raw.githubusercontent.com/GeneralKoski/kaset/main/appcast-koski.xml</string>
     <key>SUPublicEDKey</key>
     <string>qa2zoeXHqn+pluxQSGjn5HyIYA/iFtrEJz7S1BoslpI=</string>
     <key>SUEnableAutomaticChecks</key>
-    <true/>
+    <false/>
     <key>SUScheduledCheckInterval</key>
     <integer>86400</integer>
     <key>SUAllowsAutomaticUpdates</key>
-    <true/>
+    <false/>
     <key>SUEnableInstallerLauncherService</key>
     <true/>
 
