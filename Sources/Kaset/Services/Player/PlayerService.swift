@@ -117,7 +117,30 @@ final class PlayerService: NSObject, PlayerServiceProtocol {
     // MARK: - Observable State
 
     /// Current playback state.
-    var state: PlaybackState = .idle
+    var state: PlaybackState = .idle {
+        didSet {
+            switch self.state {
+            case .loading, .buffering:
+                break
+            default:
+                self.lastSettledIsPlaying = self.state.isPlaying
+            }
+        }
+    }
+
+    /// Play/pause state of the last settled transport state, ignoring loading/buffering.
+    private(set) var lastSettledIsPlaying = false
+
+    /// What play/pause controls should show: while the next track loads after a skip, keep
+    /// showing the state from before the load instead of flashing "paused".
+    var displaysAsPlaying: Bool {
+        switch self.state {
+        case .loading, .buffering:
+            self.lastSettledIsPlaying && !self.isExplicitPauseIntentActive
+        default:
+            self.state.isPlaying
+        }
+    }
 
     /// Native play/pause intent survives transient ad buffering/pauses where
     /// observable transport state is not authoritative for recovery.
@@ -457,6 +480,23 @@ final class PlayerService: NSObject, PlayerServiceProtocol {
                 self.showQueue = false
             }
         }
+    }
+
+    /// Whether the full screen now-playing view covers the main window.
+    var showFullScreenPlayer: Bool = false
+
+    /// Asks the visible player bar to open the current artist (the full screen view has no
+    /// navigation stack of its own). Several bars may observe it; the first to consume wins.
+    private(set) var artistNavigationRequest: UUID?
+
+    func requestArtistNavigation() {
+        self.artistNavigationRequest = UUID()
+    }
+
+    func consumeArtistNavigationRequest(_ request: UUID) -> Bool {
+        guard self.artistNavigationRequest == request else { return false }
+        self.artistNavigationRequest = nil
+        return true
     }
 
     /// Display mode for the queue panel (popup vs side panel).

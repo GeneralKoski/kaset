@@ -630,3 +630,9 @@
 "No songs found for “%@”." = "找不到符合「%@」的歌曲。";
 "Couldn't play “%@”." = "無法播放「%@」。";
 "Couldn't rate “%@”." = "無法評價「%@」。";
+"Show Hidden Items" = "顯示隱藏的項目";
+"Reset Order" = "重設順序";
+"Library Options" = "資料庫選項";
+"Show in Library" = "在資料庫中顯示";
+"Hide from Library" = "從資料庫中隱藏";
+"Filter by song or artist" = "依歌曲或藝人篩選";

@@ -3,45 +3,56 @@ import SwiftUI
 /// Home view displaying personalized content sections.
 struct HomeView: View {
     @State var viewModel: HomeViewModel
-    @Environment(PlayerService.self) private var playerService
-    @Environment(FavoritesManager.self) private var favoritesManager
-    @Environment(AuthService.self) private var authService
     @State private var navigationPath = NavigationPath()
-    @State private var networkMonitor = NetworkMonitor.shared
 
     var body: some View {
         NavigationStack(path: self.$navigationPath) {
-            Group {
-                if !self.networkMonitor.isConnected {
-                    ErrorView(
-                        title: String(localized: "No Connection"),
-                        message: String(localized: "Please check your internet connection and try again.")
-                    ) {
-                        Task { await self.viewModel.refresh() }
-                    }
-                } else {
-                    switch self.viewModel.loadingState {
-                    case .idle, .loading:
-                        HomeLoadingView()
-                    case .loaded, .loadingMore:
-                        self.contentView
-                    case let .error(error):
-                        ErrorView(error: error) {
-                            Task { await self.viewModel.refresh() }
-                        }
-                    }
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .localizedNavigationTitle("Home")
-            .navigationDestinations(client: self.viewModel.client)
-            .playerBarMusicNavigation(path: self.$navigationPath)
+            HomeFeedView(viewModel: self.viewModel, navigationPath: self.$navigationPath)
+                .localizedNavigationTitle("Home")
+                .navigationDestinations(client: self.viewModel.client)
+                .playerBarMusicNavigation(path: self.$navigationPath)
         }
         .playerBarMusicNavigation(path: self.$navigationPath)
         .safeAreaInset(edge: .bottom, spacing: 0) {
             PlayerBar()
                 .playerBarMusicNavigation(path: self.$navigationPath)
         }
+        .popsNavigationStackOnSidebarReselect(path: self.$navigationPath, for: .home)
+    }
+}
+
+/// Home feed content, hosted by a parent that owns the navigation stack.
+struct HomeFeedView: View {
+    let viewModel: HomeViewModel
+    @Binding var navigationPath: NavigationPath
+    @Environment(PlayerService.self) private var playerService
+    @Environment(FavoritesManager.self) private var favoritesManager
+    @Environment(AuthService.self) private var authService
+    @State private var networkMonitor = NetworkMonitor.shared
+
+    var body: some View {
+        Group {
+            if !self.networkMonitor.isConnected {
+                ErrorView(
+                    title: String(localized: "No Connection"),
+                    message: String(localized: "Please check your internet connection and try again.")
+                ) {
+                    Task { await self.viewModel.refresh() }
+                }
+            } else {
+                switch self.viewModel.loadingState {
+                case .idle, .loading:
+                    HomeLoadingView()
+                case .loaded, .loadingMore:
+                    self.contentView
+                case let .error(error):
+                    ErrorView(error: error) {
+                        Task { await self.viewModel.refresh() }
+                    }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
             if self.viewModel.loadingState == .idle {
                 Task {
@@ -49,7 +60,6 @@ struct HomeView: View {
                 }
             }
         }
-        .popsNavigationStackOnSidebarReselect(path: self.$navigationPath, for: .home)
     }
 
     // MARK: - Views

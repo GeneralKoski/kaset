@@ -51,7 +51,10 @@ struct LibraryView: View {
     @State var viewModel: LibraryViewModel
     @Environment(PlayerService.self) private var playerService
     @Environment(\.usesLegacyMacOS15UI) private var usesLegacyMacOS15UI
+    @Environment(SidebarPinnedItemsManager.self) private var sidebarPinnedItemsManager
     @State private var networkMonitor = NetworkMonitor.shared
+    @State private var layout = LibraryLayoutManager.shared
+    @State private var showsHiddenItems = false
 
     @State private var navigationPath = NavigationPath()
     @State private var selectedFilter: LibraryFilter = .all
@@ -175,7 +178,27 @@ struct LibraryView: View {
                 self.filterChip(filter)
             }
             Spacer()
+            self.layoutOptionsMenu
         }
+    }
+
+    private var layoutOptionsMenu: some View {
+        Menu {
+            Toggle(String(localized: "Show Hidden Items"), isOn: self.$showsHiddenItems)
+                .disabled(self.layout.hidden.isEmpty)
+
+            Button(String(localized: "Reset Order")) {
+                self.layout.resetOrder()
+            }
+            .disabled(self.layout.order.isEmpty)
+        } label: {
+            Image(systemName: "ellipsis.circle")
+        }
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .fixedSize()
+        .help(String(localized: "Library Options"))
+        .accessibilityLabel(String(localized: "Library Options"))
     }
 
     private func filterChip(_ filter: LibraryFilter) -> some View {
@@ -199,30 +222,28 @@ struct LibraryView: View {
         .buttonStyle(.plain)
     }
 
-    /// All library items combined and filtered.
+    /// Every library tile in the user's saved order, hidden ones included.
+    private var orderedItems: [LibraryItem] {
+        let items: [LibraryItem] = self.uploadItems
+            + self.viewModel.playlists.map { .playlist($0) }
+            + self.viewModel.albums.map { .album($0) }
+            + self.viewModel.artists.map { .artist($0) }
+            + self.viewModel.podcastShows.map { .podcast($0) }
+        return self.layout.sorted(items, id: \.id)
+    }
+
+    /// Library tiles matching the selected filter, without hidden ones unless they are shown.
     private var filteredItems: [LibraryItem] {
-        var items: [LibraryItem] = []
-
-        switch self.selectedFilter {
-        case .all:
-            items = self.uploadItems
-                + self.viewModel.playlists.map { .playlist($0) }
-                + self.viewModel.albums.map { .album($0) }
-                + self.viewModel.artists.map { .artist($0) }
-                + self.viewModel.podcastShows.map { .podcast($0) }
-        case .playlists:
-            items = self.viewModel.playlists.map { .playlist($0) }
-        case .albums:
-            items = self.viewModel.albums.map { .album($0) }
-        case .uploads:
-            items = self.uploadItems
-        case .artists:
-            items = self.viewModel.artists.map { .artist($0) }
-        case .podcasts:
-            items = self.viewModel.podcastShows.map { .podcast($0) }
+        self.orderedItems.filter { item in
+            guard self.showsHiddenItems || !self.layout.isHidden(item.id) else { return false }
+            switch (self.selectedFilter, item) {
+            case (.all, _), (.playlists, .playlist), (.albums, .album), (.uploads, .uploadedSongs),
+                 (.artists, .artist), (.podcasts, .podcast):
+                return true
+            default:
+                return false
+            }
         }
-
-        return items
     }
 
     private var uploadItems: [LibraryItem] {
@@ -241,17 +262,28 @@ struct LibraryView: View {
                 GridItem(.adaptive(minimum: self.libraryItemSize, maximum: 200), spacing: self.libraryItemSpacing),
             ], spacing: 24) {
                 ForEach(self.filteredItems) { item in
-                    switch item {
-                    case let .playlist(playlist):
-                        self.playlistCard(playlist)
-                    case let .album(album):
-                        self.albumCard(album)
-                    case let .uploadedSongs(playlist):
-                        self.uploadedSongsCard(playlist)
-                    case let .artist(artist):
-                        self.artistCard(artist)
-                    case let .podcast(show):
-                        self.podcastCard(show)
+                    Group {
+                        switch item {
+                        case let .playlist(playlist):
+                            self.playlistCard(playlist)
+                        case let .album(album):
+                            self.albumCard(album)
+                        case let .uploadedSongs(playlist):
+                            self.uploadedSongsCard(playlist)
+                        case let .artist(artist):
+                            self.artistCard(artist)
+                        case let .podcast(show):
+                            self.podcastCard(show)
+                        }
+                    }
+                    .opacity(self.layout.isHidden(item.id) ? 0.4 : 1)
+                    .draggable(item.id)
+                    .dropDestination(for: String.self) { droppedIds, _ in
+                        guard let sourceId = droppedIds.first else { return false }
+                        withAnimation(AppAnimation.standard) {
+                            self.layout.move(sourceId, onto: item.id, in: self.orderedItems.map(\.id))
+                        }
+                        return true
                     }
                 }
             }
@@ -359,6 +391,8 @@ struct LibraryView: View {
                 navigate: { self.navigationPath.append($0) }
             )
 
+            self.layoutMenuItems(for: .playlist(playlist), pin: SidebarPinnedItem.from(playlist))
+
             if playlist.canDelete {
                 Divider()
 
@@ -422,6 +456,44 @@ struct LibraryView: View {
                 client: self.viewModel.client,
                 navigate: { self.navigationPath.append($0) }
             )
+
+            self.layoutMenuItems(for: .album(album), pin: SidebarPinnedItem.from(album))
+        }
+    }
+
+    /// Sidebar pinning plus local hide/show actions shared by every tile's context menu.
+    @ViewBuilder
+    private func layoutMenuItems(for item: LibraryItem, pin: SidebarPinnedItem?) -> some View {
+        Divider()
+
+        if let pin {
+            if self.sidebarPinnedItemsManager.isPinned(pin) {
+                Button {
+                    self.sidebarPinnedItemsManager.remove(contentId: pin.contentId)
+                } label: {
+                    Label(String(localized: "Remove from Sidebar"), systemImage: "sidebar.left")
+                }
+            } else {
+                Button {
+                    self.sidebarPinnedItemsManager.add(pin)
+                } label: {
+                    Label(String(localized: "Add to Sidebar"), systemImage: "sidebar.left")
+                }
+            }
+        }
+
+        if self.layout.isHidden(item.id) {
+            Button {
+                self.layout.setHidden(false, id: item.id)
+            } label: {
+                Label(String(localized: "Show in Library"), systemImage: "eye")
+            }
+        } else {
+            Button {
+                self.layout.setHidden(true, id: item.id)
+            } label: {
+                Label(String(localized: "Hide from Library"), systemImage: "eye.slash")
+            }
         }
     }
 
@@ -481,6 +553,9 @@ struct LibraryView: View {
             .frame(width: self.libraryItemSize, height: self.libraryItemCardHeight, alignment: .topLeading)
         }
         .buttonStyle(.plain)
+        .contextMenu {
+            self.layoutMenuItems(for: .uploadedSongs(playlist), pin: nil)
+        }
     }
 
     private func podcastCard(_ show: PodcastShow) -> some View {
@@ -526,6 +601,8 @@ struct LibraryView: View {
         .buttonStyle(.plain)
         .contextMenu {
             PodcastShowContextMenu(show: show, navigate: { self.navigationPath.append($0) })
+
+            self.layoutMenuItems(for: .podcast(show), pin: nil)
         }
     }
 
@@ -566,6 +643,8 @@ struct LibraryView: View {
         .buttonStyle(.plain)
         .contextMenu {
             ArtistContextMenu(artist: artist, navigate: { self.navigationPath.append($0) })
+
+            self.layoutMenuItems(for: .artist(artist), pin: nil)
         }
     }
 }
@@ -602,4 +681,5 @@ enum LibraryItem: Identifiable {
     LibraryView(viewModel: LibraryViewModel(client: client))
         .environment(PlayerService())
         .environment(FavoritesManager.shared)
+        .environment(SidebarPinnedItemsManager(skipLoad: true))
 }

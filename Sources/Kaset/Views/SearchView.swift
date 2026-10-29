@@ -2,11 +2,15 @@ import SwiftUI
 
 // MARK: - SearchView
 
-/// Search view for finding music.
+/// Search view for finding music. When given a home view model it doubles as
+/// the Home page: the home feed fills the idle state below the search bar.
 struct SearchView: View {
     @State var viewModel: SearchViewModel
+    let homeViewModel: HomeViewModel?
+    let onSelectDiscoverItem: ((NavigationItem) -> Void)?
     @Environment(PlayerService.self) private var playerService
     @Environment(AuthService.self) private var authService
+    @Environment(PodcastsAvailabilityService.self) private var podcastsAvailability
     @State private var navigationPath = NavigationPath()
     @State private var networkMonitor = NetworkMonitor.shared
 
@@ -19,9 +23,20 @@ struct SearchView: View {
     @State private var selectedSuggestionIndex: Int = -1
 
     /// Initializes SearchView with optional focus trigger binding.
-    init(viewModel: SearchViewModel, focusTrigger: Binding<Bool> = .constant(false)) {
+    init(
+        viewModel: SearchViewModel,
+        homeViewModel: HomeViewModel? = nil,
+        focusTrigger: Binding<Bool> = .constant(false),
+        onSelectDiscoverItem: ((NavigationItem) -> Void)? = nil
+    ) {
         _viewModel = State(initialValue: viewModel)
+        self.homeViewModel = homeViewModel
+        self.onSelectDiscoverItem = onSelectDiscoverItem
         _focusTrigger = focusTrigger
+    }
+
+    private var navigationItem: NavigationItem {
+        self.homeViewModel == nil ? .search : .home
     }
 
     var body: some View {
@@ -36,7 +51,7 @@ struct SearchView: View {
                 // Content
                 self.contentView
             }
-            .localizedNavigationTitle("Search")
+            .localizedNavigationTitle(self.homeViewModel == nil ? "Search" : "Home")
             .navigationDestinations(client: self.viewModel.client)
             .playerBarMusicNavigation(path: self.$navigationPath)
         }
@@ -46,7 +61,9 @@ struct SearchView: View {
                 .playerBarMusicNavigation(path: self.$navigationPath)
         }
         .onAppear {
-            self.isSearchFieldFocused = true
+            if self.homeViewModel == nil {
+                self.isSearchFieldFocused = true
+            }
         }
         .onChange(of: self.focusTrigger) { _, newValue in
             if newValue {
@@ -54,7 +71,7 @@ struct SearchView: View {
                 self.focusTrigger = false
             }
         }
-        .popsNavigationStackOnSidebarReselect(path: self.$navigationPath, for: .search)
+        .popsNavigationStackOnSidebarReselect(path: self.$navigationPath, for: self.navigationItem)
     }
 
     // MARK: - Search Bar
@@ -65,14 +82,20 @@ struct SearchView: View {
             // in the search bar's layout, macOS 26 glass materialization can render a
             // second transient plate during updates. Anchoring it as an overlay gives the
             // autocomplete menu a single visual owner and prevents duplicate dropdowns.
-            self.searchField
-                .overlay(alignment: .top) {
-                    if self.viewModel.showSuggestions {
-                        self.suggestionsDropdown
-                            .padding(.top, 44) // Below search field
+            HStack(spacing: 12) {
+                self.searchField
+                    .overlay(alignment: .top) {
+                        if self.viewModel.showSuggestions {
+                            self.suggestionsDropdown
+                                .padding(.top, 44) // Below search field
+                        }
                     }
+
+                if self.onSelectDiscoverItem != nil {
+                    self.discoverMenu
                 }
-                .zIndex(1)
+            }
+            .zIndex(1)
 
             // Filter chips
             if self.viewModel.shouldShowFilters {
@@ -147,6 +170,29 @@ struct SearchView: View {
             }
         }
         .padding(10)
+        .compatGlass(in: .capsule)
+    }
+
+    private var discoverMenu: some View {
+        Menu {
+            ForEach(NavigationItem.discoverItems) { item in
+                if item != .podcasts || self.podcastsAvailability.availability != .unavailable {
+                    Button {
+                        self.onSelectDiscoverItem?(item)
+                    } label: {
+                        Label(item.displayName, systemImage: item.icon)
+                    }
+                }
+            }
+        } label: {
+            Label(String(localized: "Discover"), systemImage: "safari")
+                .padding(.horizontal, 6)
+                .padding(.vertical, 4)
+        }
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .fixedSize()
+        .padding(6)
         .compatGlass(in: .capsule)
     }
 
@@ -234,7 +280,11 @@ struct SearchView: View {
         } else {
             switch self.viewModel.loadingState {
             case .idle:
-                self.emptyStateView
+                if let homeViewModel {
+                    HomeFeedView(viewModel: homeViewModel, navigationPath: self.$navigationPath)
+                } else {
+                    self.emptyStateView
+                }
             case .loading:
                 LoadingView(String(localized: "Searching..."))
             case .loaded, .loadingMore:
@@ -489,4 +539,5 @@ struct SearchView: View {
     SearchView(viewModel: SearchViewModel(client: client), focusTrigger: $focusTrigger)
         .environment(PlayerService())
         .environment(FavoritesManager.shared)
+        .environment(PodcastsAvailabilityService())
 }

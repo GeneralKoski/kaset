@@ -542,7 +542,13 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
             await homeViewModel.refresh()
         case .video:
             guard self.youtubeNavigationSelection == .home else { return }
-            await self.youtubeStore.home.refresh()
+            if self.hasPersonalAccount {
+                await self.youtubeStore.subscriptions.refresh()
+                await self.youtubeStore.playlists.refresh()
+                await self.youtubeStore.watchLater.load()
+            } else {
+                await self.youtubeStore.home.refresh()
+            }
         }
     }
 
@@ -587,7 +593,10 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                 } else {
                     YouTubeContentView(
                         selection: self.youtubeNavigationSelection,
-                        store: self.youtubeStore
+                        store: self.youtubeStore,
+                        onSelect: { item in
+                            self.youtubeNavigationSelection = item
+                        }
                     )
                 }
             }
@@ -596,9 +605,17 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
 
             // Right sidebar overlay - either lyrics or queue (mutually exclusive)
             self.rightSidebarOverlay(client: self.client)
+
+            if self.playerService.showFullScreenPlayer, self.settings.appSource == .music {
+                FullScreenPlayerView()
+                    .ignoresSafeArea()
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .zIndex(1)
+            }
         }
         .animation(.easeInOut(duration: 0.25), value: self.playerService.showLyrics)
         .animation(.easeInOut(duration: 0.25), value: self.playerService.showQueue)
+        .toolbar(self.isShowingFullScreenPlayer ? .hidden : .automatic, for: .windowToolbar)
         .frame(minWidth: MainWindowLayout.minimumWidth, minHeight: MainWindowLayout.minimumHeight)
         .toolbar {
             if self.supportsCommandBarUI {
@@ -616,6 +633,10 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                 }
             }
         }
+    }
+
+    private var isShowingFullScreenPlayer: Bool {
+        self.playerService.showFullScreenPlayer && self.settings.appSource == .music
     }
 
     private func presentCommandBarIfAvailable() {
@@ -704,8 +725,15 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
         Group {
             switch item {
             case .home:
-                if let vm = homeViewModel {
-                    HomeView(viewModel: vm)
+                if let vm = searchViewModel, let homeViewModel {
+                    SearchView(
+                        viewModel: vm,
+                        homeViewModel: homeViewModel,
+                        focusTrigger: self.searchFocusTrigger,
+                        onSelectDiscoverItem: { item in
+                            self.navigationSelection = item
+                        }
+                    )
                 }
             case .explore:
                 if let vm = exploreViewModel {
@@ -1177,6 +1205,9 @@ enum NavigationItem: String, Hashable, CaseIterable, Identifiable {
             "clock.arrow.circlepath"
         }
     }
+
+    /// Browse destinations reached from the Home page's Discover menu.
+    static let discoverItems: [NavigationItem] = [.explore, .charts, .moodsAndGenres, .newReleases, .podcasts]
 
     var requiresSignIn: Bool {
         switch self {

@@ -9,6 +9,7 @@ import SwiftUI
 struct YouTubeContentView: View {
     let selection: YouTubeNavigationItem?
     @Bindable var store: YouTubeViewModelStore
+    var onSelect: ((YouTubeNavigationItem) -> Void)?
 
     @Environment(AuthService.self) private var authService
     @Environment(YouTubePlayerService.self) private var youtubePlayer
@@ -136,7 +137,11 @@ struct YouTubeContentView: View {
     private func publicOrAuthenticatedRootView(for item: YouTubeNavigationItem) -> some View {
         switch item {
         case .home:
-            YouTubeHomeView(viewModel: self.store.home)
+            if self.hasPersonalAccount {
+                YouTubeDashboardView(store: self.store, onShowAll: self.onSelect)
+            } else {
+                YouTubeHomeView(viewModel: self.store.home)
+            }
         case .search:
             YouTubeSearchView(viewModel: self.store.search)
         case .explore:

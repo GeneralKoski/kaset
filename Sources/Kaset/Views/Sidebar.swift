@@ -15,39 +15,15 @@ struct Sidebar: View {
     @Environment(AuthService.self) private var authService
     @Environment(PlayerService.self) private var playerService
     @Environment(SidebarPinnedItemsManager.self) private var sidebarPinnedItemsManager
-    @Environment(PodcastsAvailabilityService.self) private var podcastsAvailability
     @State private var isCreatingPlaylist = false
     @State private var isHoveringPlaylistsHeader = false
 
     var body: some View {
         List {
-            // Main navigation
+            // Main navigation: Home hosts search and the Discover menu.
             Section {
-                self.navigationRow(.search)
-                    .accessibilityIdentifier(AccessibilityID.Sidebar.searchItem)
-
                 self.navigationRow(.home)
                     .accessibilityIdentifier(AccessibilityID.Sidebar.homeItem)
-            }
-
-            // Discover section
-            Section(String(localized: "Discover")) {
-                self.navigationRow(.explore)
-                    .accessibilityIdentifier(AccessibilityID.Sidebar.exploreItem)
-
-                self.navigationRow(.charts)
-                    .accessibilityIdentifier(AccessibilityID.Sidebar.chartsItem)
-
-                self.navigationRow(.moodsAndGenres)
-                    .accessibilityIdentifier(AccessibilityID.Sidebar.moodsAndGenresItem)
-
-                self.navigationRow(.newReleases)
-                    .accessibilityIdentifier(AccessibilityID.Sidebar.newReleasesItem)
-
-                if self.podcastsAvailability.availability != .unavailable {
-                    self.navigationRow(.podcasts)
-                        .accessibilityIdentifier(AccessibilityID.Sidebar.podcastsItem)
-                }
             }
 
             if self.hasPersonalAccount {
@@ -107,10 +83,18 @@ struct Sidebar: View {
         KasetSidebarRow(
             title: item.displayName,
             systemImage: item.icon,
-            isSelected: self.currentSidebarSelection == .navigation(item)
+            isSelected: self.isRowSelected(item)
         ) {
             self.selectNavigationItem(item)
         }
+    }
+
+    /// Discover pages and search have no rows of their own; Home stays highlighted for them.
+    private func isRowSelected(_ item: NavigationItem) -> Bool {
+        if item == .home, self.pinnedSelection == nil, let selection {
+            return selection == .home || selection == .search || NavigationItem.discoverItems.contains(selection)
+        }
+        return self.currentSidebarSelection == .navigation(item)
     }
 
     private func selectNavigationItem(_ item: NavigationItem) {

@@ -632,3 +632,9 @@
 "No songs found for “%@”." = "Tidak ada lagu yang ditemukan untuk “%@”.";
 "Couldn't play “%@”." = "Tidak dapat memutar “%@”.";
 "Couldn't rate “%@”." = "Tidak dapat memberi rating “%@”.";
+"Show Hidden Items" = "Tampilkan Item Tersembunyi";
+"Reset Order" = "Atur Ulang Urutan";
+"Library Options" = "Opsi Pustaka";
+"Show in Library" = "Tampilkan di Pustaka";
+"Hide from Library" = "Sembunyikan dari Pustaka";
+"Filter by song or artist" = "Filter menurut lagu atau artis";

@@ -630,3 +630,9 @@
 "No songs found for “%@”." = "未找到与“%@”匹配的歌曲。";
 "Couldn't play “%@”." = "无法播放“%@”。";
 "Couldn't rate “%@”." = "无法评价“%@”。";
+"Show Hidden Items" = "显示隐藏的项目";
+"Reset Order" = "重置顺序";
+"Library Options" = "资料库选项";
+"Show in Library" = "在资料库中显示";
+"Hide from Library" = "从资料库中隐藏";
+"Filter by song or artist" = "按歌曲或艺人筛选";

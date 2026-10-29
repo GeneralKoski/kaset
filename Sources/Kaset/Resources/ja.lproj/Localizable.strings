@@ -627,3 +627,9 @@
 "No songs found for “%@”." = "「%@」に一致する曲が見つかりませんでした。";
 "Couldn't play “%@”." = "「%@」を再生できませんでした。";
 "Couldn't rate “%@”." = "「%@」を評価できませんでした。";
+"Show Hidden Items" = "非表示の項目を表示";
+"Reset Order" = "並び順をリセット";
+"Library Options" = "ライブラリのオプション";
+"Show in Library" = "ライブラリに表示";
+"Hide from Library" = "ライブラリで非表示";
+"Filter by song or artist" = "曲名またはアーティストで絞り込む";

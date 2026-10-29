@@ -632,3 +632,9 @@
 "No songs found for “%@”." = "Не найдено треков по запросу «%@».";
 "Couldn't play “%@”." = "Не удалось воспроизвести «%@».";
 "Couldn't rate “%@”." = "Не удалось оценить «%@».";
+"Show Hidden Items" = "Показать скрытые объекты";
+"Reset Order" = "Сбросить порядок";
+"Library Options" = "Параметры медиатеки";
+"Show in Library" = "Показать в медиатеке";
+"Hide from Library" = "Скрыть из медиатеки";
+"Filter by song or artist" = "Фильтр по песне или исполнителю";

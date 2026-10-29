@@ -118,15 +118,6 @@ final class PlayerBarUITests: KasetUITestCase {
         XCTAssertTrue(waitForElement(airPlayButton, timeout: 10), "AirPlay button should exist")
     }
 
-    func testVideoButtonExists() {
-        launchWithMockPlayer(isPlaying: true)
-
-        navigateToHome()
-
-        let videoButton = app.buttons[TestAccessibilityID.PlayerBar.videoButton]
-        XCTAssertTrue(waitForElement(videoButton, timeout: 10), "Video button should exist")
-    }
-
     func testMiniPlayerButtonExists() {
         launchWithMockPlayer(isPlaying: true)
 

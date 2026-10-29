@@ -18,7 +18,6 @@
 		E5000008 /* PlayerBarUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5000108 /* PlayerBarUITests.swift */; };
 		E5000009 /* SearchViewUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5000109 /* SearchViewUITests.swift */; };
 		E500000A /* SidebarUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E500010A /* SidebarUITests.swift */; };
-		E500000B /* VideoUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E500010B /* VideoUITests.swift */; };
 		E500000C /* MacOS15FallbackUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E500010C /* MacOS15FallbackUITests.swift */; };
 /* End PBXBuildFile section */
 
@@ -34,7 +33,6 @@
 		E5000108 /* PlayerBarUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerBarUITests.swift; sourceTree = "<group>"; };
 		E5000109 /* SearchViewUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchViewUITests.swift; sourceTree = "<group>"; };
 		E500010A /* SidebarUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarUITests.swift; sourceTree = "<group>"; };
-		E500010B /* VideoUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoUITests.swift; sourceTree = "<group>"; };
 		E500010C /* MacOS15FallbackUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacOS15FallbackUITests.swift; sourceTree = "<group>"; };
 		E5000200 /* KasetUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = KasetUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -73,7 +71,6 @@
 				E5000108 /* PlayerBarUITests.swift */,
 				E5000109 /* SearchViewUITests.swift */,
 				E500010A /* SidebarUITests.swift */,
-				E500010B /* VideoUITests.swift */,
 			);
 			name = KasetUITests;
 			path = Tests/KasetUITests;
@@ -151,7 +148,6 @@
 				E5000008 /* PlayerBarUITests.swift in Sources */,
 				E5000009 /* SearchViewUITests.swift in Sources */,
 				E500000A /* SidebarUITests.swift in Sources */,
-				E500000B /* VideoUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

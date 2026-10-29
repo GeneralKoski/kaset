@@ -42,10 +42,10 @@ struct CommandBarView: View {
             client: client,
             playerService: playerService,
             searchRouter: { query in
-                let alreadyOnSearch = navigationSelection.wrappedValue == .search
-                navigationSelection.wrappedValue = .search
+                let alreadyOnSearch = navigationSelection.wrappedValue == .home
+                navigationSelection.wrappedValue = .home
                 if alreadyOnSearch {
-                    sidebarNavigationReselectGenerations.wrappedValue[.search, default: 0] += 1
+                    sidebarNavigationReselectGenerations.wrappedValue[.home, default: 0] += 1
                 }
                 searchViewModel?.selectedFilter = .all
                 searchViewModel?.query = query.trimmingCharacters(in: .whitespacesAndNewlines)

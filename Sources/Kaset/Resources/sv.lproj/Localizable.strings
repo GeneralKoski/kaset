@@ -632,3 +632,9 @@
 "No songs found for “%@”." = "Inga låtar hittades för ”%@”.";
 "Couldn't play “%@”." = "Kunde inte spela ”%@”.";
 "Couldn't rate “%@”." = "Kunde inte betygsätta ”%@”.";
+"Show Hidden Items" = "Visa dolda objekt";
+"Reset Order" = "Återställ ordning";
+"Library Options" = "Biblioteksalternativ";
+"Show in Library" = "Visa i biblioteket";
+"Hide from Library" = "Dölj i biblioteket";
+"Filter by song or artist" = "Filtrera efter låt eller artist";

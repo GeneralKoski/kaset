@@ -649,12 +649,12 @@ struct KasetApp: App {
     }
 
     private func activateMusicSearch() {
-        let alreadyOnSearch = self.navigationSelection == .search
-        self.navigationSelection = .search
+        let alreadyOnSearch = self.navigationSelection == .home
+        self.navigationSelection = .home
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(100))
             if alreadyOnSearch {
-                self.sidebarNavigationReselectGenerations[.search, default: 0] += 1
+                self.sidebarNavigationReselectGenerations[.home, default: 0] += 1
             }
             self.searchFocusTrigger = true
         }

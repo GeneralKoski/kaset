@@ -632,3 +632,9 @@
 "No songs found for “%@”." = "No se encontraron canciones para “%@”.";
 "Couldn't play “%@”." = "No se pudo reproducir “%@”.";
 "Couldn't rate “%@”." = "No se pudo valorar “%@”.";
+"Show Hidden Items" = "Mostrar elementos ocultos";
+"Reset Order" = "Restablecer orden";
+"Library Options" = "Opciones de la biblioteca";
+"Show in Library" = "Mostrar en la biblioteca";
+"Hide from Library" = "Ocultar de la biblioteca";
+"Filter by song or artist" = "Filtrar por canción o artista";

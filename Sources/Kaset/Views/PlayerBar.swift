@@ -75,6 +75,10 @@ struct PlayerBar: View { // swiftlint:disable:this type_body_length
         .onChange(of: self.currentSeekIdentity) { _, _ in
             self.seekController.clearHold(playerService: self.playerService)
         }
+        .onChange(of: self.playerService.artistNavigationRequest) { _, request in
+            guard let request, self.playerService.consumeArtistNavigationRequest(request) else { return }
+            self.openCurrentArtist()
+        }
         .onChange(of: self.playerService.isShowingAd) { _, isShowingAd in
             if isShowingAd {
                 self.seekController.clearHold(playerService: self.playerService)
@@ -211,6 +215,21 @@ struct PlayerBar: View { // swiftlint:disable:this type_body_length
                 reduceMotion: self.reduceMotion
             )
             .id(self.currentTitleIdentity)
+            .overlay {
+                // The marquee is AppKit-hosted and the bar's interactive glass swallows plain
+                // tap gestures, so a transparent Button takes the click.
+                Button {
+                    guard self.playerService.currentTrack != nil else { return }
+                    HapticService.toggle()
+                    withAnimation(AppAnimation.standard) {
+                        self.playerService.showFullScreenPlayer = true
+                    }
+                } label: {
+                    Color.clear
+                        .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+            }
             .accessibilityIdentifier(AccessibilityID.PlayerBar.trackTitle)
 
             PlayerBarMetadataButton(
@@ -451,9 +470,9 @@ struct PlayerBar: View { // swiftlint:disable:this type_body_length
                 PlayerBarIconButton(
                     action: self.playPause,
                     accessibilityID: AccessibilityID.PlayerBar.playPauseButton,
-                    accessibilityLabel: self.playerService.isPlaying ? String(localized: "Pause") : String(localized: "Play")
+                    accessibilityLabel: self.playerService.displaysAsPlaying ? String(localized: "Pause") : String(localized: "Play")
                 ) {
-                    Image(systemName: self.playerService.isPlaying ? "pause.fill" : "play.fill")
+                    Image(systemName: self.playerService.displaysAsPlaying ? "pause.fill" : "play.fill")
                         .font(.system(size: 20, weight: .regular))
                         .frame(width: 12, height: 20)
                         .foregroundStyle(.primary)
@@ -559,18 +578,6 @@ struct PlayerBar: View { // swiftlint:disable:this type_body_length
         self.colorScheme == .dark ? .black.opacity(0.36) : .black.opacity(0.18)
     }
 
-    private var canShowCurrentTrackVideo: Bool {
-        guard let track = self.playerService.currentTrack else { return false }
-        if UITestConfig.isUITestMode,
-           UITestConfig.environmentValue(for: UITestConfig.mockHasVideoKey) == "true"
-        {
-            return true
-        }
-        return self.playerService.currentTrackHasVideo
-            || track.musicVideoType?.hasVideoContent == true
-            || track.hasVideo == true
-    }
-
     private var currentSeekIdentity: String {
         self.playerService.currentTrack?.videoId ?? "none"
     }
@@ -581,7 +588,6 @@ struct PlayerBar: View { // swiftlint:disable:this type_body_length
         HStack(spacing: 6) {
             self.lyricsButton
             self.queueButton
-            self.pictureButton
             self.miniPlayerButton
         }
         .padding(.trailing, 12)
@@ -637,28 +643,6 @@ struct PlayerBar: View { // swiftlint:disable:this type_body_length
         .compatGlassID("queue", in: self.playerNamespace)
     }
 
-    private var pictureButton: some View {
-        PlayerBarIconButton(
-            action: {
-                self.toggleVideo()
-            },
-            isSelected: self.playerService.showVideo,
-            accessibilityID: AccessibilityID.PlayerBar.videoButton,
-            accessibilityLabel: String(localized: "Video"),
-            accessibilityValue: self.playerService.showVideo ? String(localized: "Playing") : String(localized: "Off"),
-            icon: {
-                Image(systemName: self.pictureButtonIcon)
-                    .font(.system(size: 15, weight: .regular))
-                    .frame(width: 13, height: 14)
-                    .foregroundStyle(self.playerService.showVideo ? Self.brandAccent : .primary)
-                    .contentTransition(.symbolEffect(.replace))
-            }
-        )
-        .compatGlassID("picture", in: self.playerNamespace)
-        .keyboardShortcut("v", modifiers: [.command, .shift])
-        .disabled(!self.canShowCurrentTrackVideo)
-    }
-
     private var miniPlayerButton: some View {
         @Bindable var player = self.playerService
 
@@ -680,21 +664,6 @@ struct PlayerBar: View { // swiftlint:disable:this type_body_length
             }
         )
         .compatGlassID("miniPlayer", in: self.playerNamespace)
-    }
-
-    private var pictureButtonIcon: String {
-        self.playerService.showVideo ? "pip.exit" : "pip.enter"
-    }
-
-    private func toggleVideo() {
-        guard self.canShowCurrentTrackVideo else { return }
-        HapticService.toggle()
-        DiagnosticsLogger.player.debug(
-            "Video button clicked, toggling showVideo from \(self.playerService.showVideo)"
-        )
-        withAnimation(AppAnimation.standard) {
-            self.playerService.showVideo.toggle()
-        }
     }
 
     // MARK: - Current Song Context Menu
@@ -831,7 +800,6 @@ struct PlayerBar: View { // swiftlint:disable:this type_body_length
             guard !Task.isCancelled, self.currentTitleIdentity == identity else { return }
             self.resolvedArtist = artist
             self.isResolvingArtist = false
-
             guard let artist, !self.isCurrentArtistTarget else { return }
             self.openArtist(artist, playsHaptic: false)
         }

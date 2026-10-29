@@ -667,10 +667,10 @@ struct MiniPlayerWindow: View {
             .disabled(self.playerService.currentEpisode != nil)
 
             self.transportButton(
-                systemName: self.playerService.isPlaying ? "pause.fill" : "play.fill",
+                systemName: self.playerService.displaysAsPlaying ? "pause.fill" : "play.fill",
                 size: playSize,
                 accessibilityID: AccessibilityID.MiniPlayer.playPauseButton,
-                label: self.playerService.isPlaying ? String(localized: "Pause") : String(localized: "Play")
+                label: self.playerService.displaysAsPlaying ? String(localized: "Pause") : String(localized: "Play")
             ) {
                 Task { await self.playerService.playPause() }
             }

@@ -632,3 +632,9 @@
 "No songs found for “%@”." = "Geen nummers gevonden voor ‘%@’.";
 "Couldn't play “%@”." = "Kon ‘%@’ niet afspelen.";
 "Couldn't rate “%@”." = "Kon ‘%@’ niet beoordelen.";
+"Show Hidden Items" = "Verborgen onderdelen tonen";
+"Reset Order" = "Volgorde herstellen";
+"Library Options" = "Bibliotheekopties";
+"Show in Library" = "Tonen in bibliotheek";
+"Hide from Library" = "Verbergen in bibliotheek";
+"Filter by song or artist" = "Filteren op nummer of artiest";

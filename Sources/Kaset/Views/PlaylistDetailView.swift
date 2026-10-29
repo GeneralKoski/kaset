@@ -27,6 +27,8 @@ struct PlaylistDetailView: View {
     @State private var isRefining: Bool = false
     /// Error message from refine operation.
     @State private var refineError: String?
+    /// Text filtering the playlist's tracks by title or artist.
+    @State private var trackFilter: String = ""
     /// Computed property to check if playlist is in library.
     var isInLibrary: Bool {
         if self.playlist.isAlbum {
@@ -100,6 +102,11 @@ struct PlaylistDetailView: View {
         .refreshable {
             await self.viewModel.refresh()
         }
+        // Filtering must see every track, not just the pages scrolled so far.
+        .task(id: self.isFilteringTracks) {
+            guard self.isFilteringTracks, self.viewModel.hasMore else { return }
+            await self.viewModel.loadAllRemaining()
+        }
         .onChange(of: self.likeStatusManager.lastLikeEventBatch) { _, batch in
             guard let batch, batch.accountID == self.likeStatusManager.activeAccountID else { return }
             for event in batch.events {
@@ -146,13 +153,26 @@ struct PlaylistDetailView: View {
                 self.headerView(detail)
                     .padding(.bottom, 24)
 
+                if !detail.isAlbum {
+                    self.trackFilterField
+                        .padding(.bottom, 16)
+                }
+
                 Divider()
                     .padding(.bottom, 24)
 
-                self.trackRows(
-                    detail.tracks, isAlbum: detail.isAlbum, author: detail.author?.name,
-                    fallbackAlbum: fallbackAlbum
-                )
+                let tracks = self.filteredTracks(detail.tracks, author: detail.author?.name)
+                if self.isFilteringTracks, tracks.isEmpty, !self.viewModel.hasMore {
+                    Text(String(localized: "No results found"))
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 24)
+                } else {
+                    self.trackRows(
+                        tracks, isAlbum: detail.isAlbum, author: detail.author?.name,
+                        fallbackAlbum: fallbackAlbum
+                    )
+                }
             }
             .padding(.vertical, 24)
             // Inset the resting content while the scroll view stays edge-to-edge so
@@ -165,6 +185,54 @@ struct PlaylistDetailView: View {
         // flexible frame that query measured the scroll content — a cost that grew
         // with every loaded page of tracks.
         .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+    }
+
+    private var isFilteringTracks: Bool {
+        !self.trackFilter.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private func filteredTracks(_ tracks: [Song], author: String?) -> [Song] {
+        let query = self.trackFilter.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return tracks }
+        return tracks.filter { track in
+            track.title.localizedStandardContains(query)
+                || track.artistsDisplay.localizedStandardContains(query)
+                || (self.trackArtistsDisplay(for: track, fallbackAuthor: author)?.localizedStandardContains(query) ?? false)
+        }
+    }
+
+    private var trackFilterField: some View {
+        HStack {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+
+            TextField(String(localized: "Filter by song or artist"), text: self.$trackFilter)
+                .textFieldStyle(.plain)
+                .onKeyPress(.escape) {
+                    guard !self.trackFilter.isEmpty else { return .ignored }
+                    self.trackFilter = ""
+                    return .handled
+                }
+
+            if self.isFilteringTracks, self.viewModel.hasMore {
+                ProgressView()
+                    .controlSize(.small)
+            }
+
+            if !self.trackFilter.isEmpty {
+                Button {
+                    self.trackFilter = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(String(localized: "Clear search"))
+            }
+        }
+        .padding(10)
+        .frame(maxWidth: 420)
+        .compatGlass(in: .capsule)
     }
 
     private func headerView(_ detail: PlaylistDetail) -> some View {

@@ -632,3 +632,9 @@
 "No songs found for “%@”." = "“%@” için şarkı bulunamadı.";
 "Couldn't play “%@”." = "“%@” çalınamadı.";
 "Couldn't rate “%@”." = "“%@” derecelendirilemedi.";
+"Show Hidden Items" = "Gizli Öğeleri Göster";
+"Reset Order" = "Sırayı Sıfırla";
+"Library Options" = "Kitaplık Seçenekleri";
+"Show in Library" = "Kitaplıkta Göster";
+"Hide from Library" = "Kitaplıktan Gizle";
+"Filter by song or artist" = "Şarkıya veya sanatçıya göre filtrele";
