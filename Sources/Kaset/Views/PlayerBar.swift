@@ -75,6 +75,10 @@ struct PlayerBar: View { // swiftlint:disable:this type_body_length
         .onChange(of: self.currentSeekIdentity) { _, _ in
             self.seekController.clearHold(playerService: self.playerService)
         }
+        .onChange(of: self.playerService.artistNavigationRequest) { _, request in
+            guard let request, self.playerService.consumeArtistNavigationRequest(request) else { return }
+            self.openCurrentArtist()
+        }
         .onChange(of: self.playerService.isShowingAd) { _, isShowingAd in
             if isShowingAd {
                 self.seekController.clearHold(playerService: self.playerService)
@@ -211,6 +215,21 @@ struct PlayerBar: View { // swiftlint:disable:this type_body_length
                 reduceMotion: self.reduceMotion
             )
             .id(self.currentTitleIdentity)
+            .overlay {
+                // The marquee is AppKit-hosted and the bar's interactive glass swallows plain
+                // tap gestures, so a transparent Button takes the click.
+                Button {
+                    guard self.playerService.currentTrack != nil else { return }
+                    HapticService.toggle()
+                    withAnimation(AppAnimation.standard) {
+                        self.playerService.showFullScreenPlayer = true
+                    }
+                } label: {
+                    Color.clear
+                        .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+            }
             .accessibilityIdentifier(AccessibilityID.PlayerBar.trackTitle)
 
             PlayerBarMetadataButton(
