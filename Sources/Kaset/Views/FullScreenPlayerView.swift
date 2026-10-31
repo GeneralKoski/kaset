@@ -2,62 +2,75 @@ import SwiftUI
 
 // MARK: - FullScreenPlayerView
 
-/// Now-playing view that covers the main window: large artwork, track info and transport
-/// controls over a blurred copy of the artwork. Closing it reveals the untouched window below.
+/// Now-playing view that covers the main window, laid out like Apple Music's full screen
+/// player: artwork, track info and transport controls on the left, lyrics or the queue on
+/// the right, over a blurred copy of the artwork. Closing it reveals the untouched window below.
 struct FullScreenPlayerView: View {
+    /// Content shown beside the player column.
+    enum SidePane {
+        case lyrics
+        case queue
+    }
+
     @Environment(PlayerService.self) private var playerService
     @Environment(AuthService.self) private var authService
+    @Environment(\.usesLegacyMacOS15UI) private var usesLegacyMacOS15UI
     @State private var seekState = MiniPlayerSeekState()
+    @State private var sidePane: SidePane? = .lyrics
 
     var body: some View {
         GeometryReader { geometry in
-            let isWide = geometry.size.width > geometry.size.height * 1.25
+            let size = geometry.size
 
             ZStack {
                 self.backdrop
 
-                if isWide {
-                    // Artwork on the left, info and controls on the right (Apple Music style).
-                    let artworkSize = max(200, min(geometry.size.height - 160, geometry.size.width * 0.45))
-                    HStack(spacing: 72) {
-                        self.artwork(size: artworkSize)
+                HStack(spacing: 0) {
+                    let columnWidth = self.sidePane == nil ? size.width : size.width / 2
+                    let artworkSize = Self.artworkSize(for: size, columnWidth: columnWidth)
 
-                        VStack(alignment: .leading, spacing: 28) {
-                            self.trackInfo(alignment: .leading, titleSize: 38, artistSize: 22)
+                    self.playerColumn(artworkSize: artworkSize)
+                        .frame(width: columnWidth)
+                        .frame(maxHeight: .infinity)
 
-                            MiniPlayerSeekSection(state: self.seekState)
-
-                            self.transportControls
-                        }
-                        .frame(maxWidth: 480, alignment: .leading)
+                    if let sidePane = self.sidePane {
+                        self.sidePaneView(sidePane)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .padding(.top, 56)
+                            .padding(.bottom, 56)
+                            .padding(.trailing, 48)
+                            .transition(.move(edge: .trailing).combined(with: .opacity))
                     }
-                    .padding(64)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else {
-                    // Leave room below the artwork for title, seek bar and controls.
-                    let artworkSize = max(160, min(geometry.size.height - 340, geometry.size.width - 96, 560))
-                    VStack(spacing: 24) {
-                        Spacer(minLength: 0)
-
-                        self.artwork(size: artworkSize)
-
-                        self.trackInfo(alignment: .center, titleSize: 26, artistSize: 17)
-
-                        MiniPlayerSeekSection(state: self.seekState)
-                            .frame(width: max(artworkSize, 360))
-
-                        self.transportControls
-
-                        Spacer(minLength: 0)
-                    }
-                    .padding(.horizontal, 48)
-                    .padding(.vertical, 32)
                 }
             }
-            .overlay(alignment: .topLeading) {
-                self.closeButton
+            .overlay(alignment: .topLeading) { self.windowControls }
+            .overlay(alignment: .topTrailing) {
+                NowPlayingVolumeControl()
+                    .padding(Self.chromeInset)
+            }
+            .overlay(alignment: .bottomTrailing) {
+                self.sidePaneToggles
+                    .padding(Self.chromeInset)
             }
         }
+        .environment(\.colorScheme, .dark)
+        .animation(AppAnimation.standard, value: self.sidePane)
+    }
+
+    // MARK: - Layout
+
+    /// Inset of the glass capsules from the window edges; it lines the top capsules up with
+    /// the traffic lights.
+    private static let chromeInset: CGFloat = 8
+
+    /// Leading offset of the close capsule, just past the traffic lights.
+    private static let windowControlsLeading: CGFloat = 78
+
+    static func artworkSize(for size: CGSize, columnWidth: CGFloat) -> CGFloat {
+        // Leave room below the artwork for title, seek bar and controls.
+        let byHeight = size.height - 330
+        let byWidth = columnWidth - 120
+        return max(180, min(byHeight, byWidth, 560))
     }
 
     // MARK: - Views
@@ -69,24 +82,50 @@ struct FullScreenPlayerView: View {
             if let track = self.playerService.currentTrack {
                 SongThumbnailView(song: track, size: 320, cornerRadius: 0)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .scaleEffect(1.6)
-                    .blur(radius: 80)
-                    .opacity(0.7)
+                    .scaleEffect(1.8)
+                    .blur(radius: 90)
+                    .opacity(0.85)
                     .clipped()
             }
 
-            Color.black.opacity(0.35)
+            Color.black.opacity(0.25)
         }
         .ignoresSafeArea()
         .overlay { WindowDragHandle() }
     }
 
+    private func playerColumn(artworkSize: CGFloat) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            self.artwork(size: artworkSize)
+
+            self.trackInfo(fontSize: max(14, min(20, artworkSize * 0.05)))
+                .padding(.top, 16)
+
+            Group {
+                if self.playerService.isShowingAd {
+                    // The indicator bottom-aligns in a 30 pt frame; lift it onto the seek bar's line.
+                    PlayerBarAdIndicator()
+                        .padding(.top, -14)
+                } else {
+                    MiniPlayerSeekSection(state: self.seekState, style: .nowPlaying)
+                }
+            }
+            // Same height for both, so the controls below don't jump when an ad starts.
+            .frame(height: 36, alignment: .top)
+            .padding(.top, 18)
+
+            self.transportControls
+                .padding(.top, 14)
+        }
+        .frame(width: artworkSize)
+    }
+
     private func artwork(size: CGFloat) -> some View {
         Group {
             if let track = self.playerService.currentTrack {
-                SongThumbnailView(song: track, size: size, cornerRadius: 16)
+                SongThumbnailView(song: track, size: size, cornerRadius: 10)
             } else {
-                RoundedRectangle(cornerRadius: 16)
+                RoundedRectangle(cornerRadius: 10)
                     .fill(.white.opacity(0.12))
                     .overlay {
                         Image(systemName: "music.note")
@@ -96,105 +135,210 @@ struct FullScreenPlayerView: View {
                     .frame(width: size, height: size)
             }
         }
-        .shadow(color: .black.opacity(0.45), radius: 30, y: 12)
+        .shadow(color: .black.opacity(0.4), radius: 24, y: 10)
     }
 
-    private func trackInfo(alignment: HorizontalAlignment, titleSize: CGFloat, artistSize: CGFloat) -> some View {
-        VStack(alignment: alignment, spacing: 8) {
-            Text(self.playerService.currentTrack?.title ?? String(localized: "Not Playing"))
-                .font(.system(size: titleSize, weight: .bold))
-                .foregroundStyle(.white)
-                .lineLimit(2)
-
-            // Closes the full screen view and lets the visible player bar open the artist page.
-            Button {
-                withAnimation(AppAnimation.standard) {
-                    self.playerService.showFullScreenPlayer = false
-                }
-                self.playerService.requestArtistNavigation()
-            } label: {
-                Text(self.artistName)
-                    .font(.system(size: artistSize))
-                    .foregroundStyle(.white.opacity(0.72))
+    private func trackInfo(fontSize: CGFloat) -> some View {
+        HStack(alignment: .center, spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(self.playerService.currentTrack?.title ?? String(localized: "Not Playing"))
+                    .font(.system(size: fontSize, weight: .semibold))
+                    .foregroundStyle(.white)
                     .lineLimit(1)
+
+                // Closes the full screen view and lets the visible player bar open the artist page.
+                Button(action: self.openArtist) {
+                    Text(self.subtitle)
+                        .font(.system(size: fontSize))
+                        .foregroundStyle(.white.opacity(0.6))
+                        .lineLimit(1)
+                }
+                .buttonStyle(.plain)
+                .disabled(self.playerService.currentTrack == nil)
+                .pointerStyle(.link)
             }
-            .buttonStyle(.plain)
-            .disabled(self.playerService.currentTrack == nil)
-            .pointerStyle(.link)
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            if let track = self.playerService.currentTrack {
+                if self.authService.hasPersonalAccount {
+                    self.circleButton(
+                        systemName: self.playerService.currentTrackLikeStatus == .like ? "hand.thumbsup.fill" : "hand.thumbsup",
+                        label: String(localized: "Like"),
+                        accessibilityValue: Self.likeAccessibilityValue(for: self.playerService.currentTrackLikeStatus)
+                    ) {
+                        HapticService.toggle()
+                        self.playerService.likeCurrentTrack()
+                    }
+                }
+
+                Menu {
+                    self.moreMenu(for: track)
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(.white.opacity(0.92))
+                        .frame(width: 26, height: 26)
+                        .background(.white.opacity(0.14), in: .circle)
+                        .contentShape(.circle)
+                }
+                .menuStyle(.button)
+                .buttonStyle(.plain)
+                .menuIndicator(.hidden)
+                .fixedSize()
+                .help(String(localized: "More"))
+                .accessibilityLabel(String(localized: "More"))
+            }
         }
-        .multilineTextAlignment(alignment == .leading ? .leading : .center)
+    }
+
+    private func moreMenu(for track: Song) -> some View {
+        SongContextMenu(
+            song: track,
+            client: self.playerService.ytMusicClient,
+            libraryToggle: SongLibraryToggle(
+                isInLibrary: self.playerService.currentTrackInLibrary,
+                toggle: { self.playerService.toggleLibraryStatus() }
+            ),
+            // The overlay has no navigation stack: artist pages go through the player bar,
+            // and albums have no such route.
+            showsGoToArtist: true,
+            showsGoToAlbum: false,
+            navigate: { destination in
+                if destination is Artist {
+                    self.openArtist()
+                }
+            }
+        )
     }
 
     private var transportControls: some View {
-        HStack(spacing: 28) {
+        HStack(spacing: 0) {
             self.controlButton(
                 systemName: "shuffle",
-                size: 18,
+                size: 15,
                 isActive: self.playerService.shuffleEnabled,
-                label: String(localized: "Shuffle")
+                label: String(localized: "Shuffle"),
+                accessibilityValue: Self.shuffleAccessibilityValue(for: self.playerService.shuffleMode)
             ) {
                 self.playerService.toggleShuffle()
             }
 
-            self.controlButton(systemName: "backward.fill", size: 26, label: String(localized: "Previous track")) {
+            Spacer(minLength: 8)
+
+            self.controlButton(systemName: "backward.fill", size: 24, label: String(localized: "Previous track")) {
                 Task { await self.playerService.previous() }
             }
             .disabled(self.playerService.currentEpisode != nil)
 
+            Spacer(minLength: 8)
+
             self.controlButton(
-                systemName: self.playerService.isPlaying ? "pause.circle.fill" : "play.circle.fill",
-                size: 64,
+                systemName: self.playerService.isPlaying ? "pause.fill" : "play.fill",
+                size: 32,
                 label: self.playerService.isPlaying ? String(localized: "Pause") : String(localized: "Play")
             ) {
                 Task { await self.playerService.playPause() }
             }
+            .contentTransition(.symbolEffect(.replace))
 
-            self.controlButton(systemName: "forward.fill", size: 26, label: String(localized: "Next track")) {
+            Spacer(minLength: 8)
+
+            self.controlButton(systemName: "forward.fill", size: 24, label: String(localized: "Next track")) {
                 Task { await self.playerService.next() }
             }
             .disabled(self.playerService.currentEpisode != nil)
 
+            Spacer(minLength: 8)
+
             self.controlButton(
                 systemName: self.playerService.repeatMode == .one ? "repeat.1" : "repeat",
-                size: 18,
+                size: 15,
                 isActive: self.playerService.repeatMode != .off,
-                label: String(localized: "Repeat")
+                label: String(localized: "Repeat"),
+                accessibilityValue: Self.repeatAccessibilityValue(for: self.playerService.repeatMode)
             ) {
                 self.playerService.cycleRepeatMode()
-            }
-
-            if self.authService.hasPersonalAccount {
-                self.controlButton(
-                    systemName: self.playerService.currentTrackLikeStatus == .like ? "hand.thumbsup.fill" : "hand.thumbsup",
-                    size: 18,
-                    isActive: self.playerService.currentTrackLikeStatus == .like,
-                    label: String(localized: "Like")
-                ) {
-                    HapticService.toggle()
-                    self.playerService.likeCurrentTrack()
-                }
-                .disabled(self.playerService.currentTrack == nil)
             }
         }
     }
 
-    private var closeButton: some View {
-        Button {
-            self.close()
-        } label: {
-            Image(systemName: "chevron.down")
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.9))
-                .frame(width: 36, height: 36)
-                .compatGlass(interactive: true, in: .circle)
+    @ViewBuilder
+    private func sidePaneView(_ pane: SidePane) -> some View {
+        switch pane {
+        case .lyrics:
+            if let client = self.playerService.ytMusicClient {
+                if !self.usesLegacyMacOS15UI, #available(macOS 26.0, *) {
+                    LyricsView(client: client, showsHeader: false, preferredWidth: nil, showsPanel: false)
+                } else {
+                    SimpleLyricsView(client: client, showsHeader: false, preferredWidth: nil, showsPanel: false)
+                }
+            }
+        case .queue:
+            NowPlayingQueueView()
+        }
+    }
+
+    /// Close and mini player buttons, just past the traffic lights.
+    private var windowControls: some View {
+        HStack(spacing: 2) {
+            NowPlayingGlassIconButton(systemName: "xmark", label: String(localized: "Close"), action: self.close)
+                .keyboardShortcut(.cancelAction)
+
+            NowPlayingGlassIconButton(
+                systemName: "rectangle.inset.bottomright.filled",
+                label: String(localized: "Switch to Mini Player")
+            ) {
+                HapticService.toggle()
+                self.close()
+                _ = self.playerService.toggleMiniPlayer(mode: .switchFromMainWindow)
+            }
+        }
+        .padding(.horizontal, 2)
+        .compatGlass(interactive: true, in: .capsule)
+        .padding(.leading, Self.windowControlsLeading)
+        .padding(.top, Self.chromeInset)
+    }
+
+    private var sidePaneToggles: some View {
+        HStack(spacing: 2) {
+            self.sidePaneToggle(.lyrics, systemName: "quote.bubble", selectedSystemName: "quote.bubble.fill", label: String(localized: "Lyrics"))
+            self.sidePaneToggle(.queue, systemName: "list.bullet", selectedSystemName: "list.bullet", label: String(localized: "Queue"))
+        }
+        .padding(.horizontal, 2)
+        .compatGlass(interactive: true, in: .capsule)
+    }
+
+    private func sidePaneToggle(_ pane: SidePane, systemName: String, selectedSystemName: String, label: String) -> some View {
+        let isSelected = self.sidePane == pane
+        return NowPlayingGlassIconButton(
+            systemName: isSelected ? selectedSystemName : systemName,
+            label: label,
+            isSelected: isSelected,
+            accessibilityValue: isSelected ? String(localized: "Showing") : String(localized: "Hidden")
+        ) {
+            HapticService.toggle()
+            self.sidePane = isSelected ? nil : pane
+        }
+    }
+
+    private func circleButton(
+        systemName: String,
+        label: String,
+        accessibilityValue: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.92))
+                .frame(width: 26, height: 26)
+                .background(.white.opacity(0.14), in: .circle)
+                .contentShape(.circle)
         }
         .buttonStyle(.plain)
-        .keyboardShortcut(.cancelAction)
-        .help(String(localized: "Close"))
-        .accessibilityLabel(String(localized: "Close"))
-        .padding(.leading, 20)
-        // Clear the window's traffic lights, which float over the hidden title bar.
-        .padding(.top, 48)
+        .help(label)
+        .accessibilityLabel(label)
+        .accessibilityValue(accessibilityValue)
     }
 
     private func controlButton(
@@ -202,25 +346,59 @@ struct FullScreenPlayerView: View {
         size: CGFloat,
         isActive: Bool = false,
         label: String,
+        accessibilityValue: String = "",
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
             Image(systemName: systemName)
-                .font(.system(size: size, weight: .semibold))
+                .font(.system(size: size, weight: .medium))
                 .foregroundStyle(isActive ? PackageResourceLookup.brandAccent : .white.opacity(0.92))
-                .frame(minWidth: 36, minHeight: 36)
+                .frame(minWidth: 36, minHeight: 40)
                 .contentShape(.rect)
         }
         .buttonStyle(.plain)
         .help(label)
         .accessibilityLabel(label)
+        .accessibilityValue(accessibilityValue)
     }
 
     // MARK: - Helpers
 
-    private var artistName: String {
+    static func shuffleAccessibilityValue(for mode: PlayerService.ShuffleMode) -> String {
+        switch mode {
+        case .off: String(localized: "Off")
+        case .on: String(localized: "On")
+        case .smart: String(localized: "Smart")
+        }
+    }
+
+    static func repeatAccessibilityValue(for mode: PlayerService.RepeatMode) -> String {
+        switch mode {
+        case .off: String(localized: "Off")
+        case .all: String(localized: "All")
+        case .one: String(localized: "One")
+        }
+    }
+
+    static func likeAccessibilityValue(for status: LikeStatus) -> String {
+        status == .like ? String(localized: "Liked") : String(localized: "Not liked")
+    }
+
+    /// "Artist — Album", or just the artist when the album is unknown.
+    static func subtitle(for track: Song) -> String {
+        let artist = track.artistsDisplay.isEmpty ? String(localized: "Unknown Artist") : track.artistsDisplay
+        guard let album = track.album?.title, !album.isEmpty else { return artist }
+        return "\(artist) — \(album)"
+    }
+
+    private var subtitle: String {
         guard let track = self.playerService.currentTrack else { return "" }
-        return track.artistsDisplay.isEmpty ? String(localized: "Unknown Artist") : track.artistsDisplay
+        return Self.subtitle(for: track)
+    }
+
+    private func openArtist() {
+        self.close()
+        self.playerService.requestArtistNavigation()
     }
 
     private func close() {

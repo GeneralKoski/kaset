@@ -8,7 +8,7 @@ import SwiftUI
 struct PlayerBar: View { // swiftlint:disable:this type_body_length
     private static let brandAccent = PackageResourceLookup.brandAccent
     private static let fullSongInfoWidth: CGFloat = 234
-    private static let compactSongInfoWidth: CGFloat = 116
+    private static let compactSongInfoWidth: CGFloat = 152
 
     @Environment(AuthService.self) private var authService
     @Environment(PlayerService.self) private var playerService
@@ -120,7 +120,17 @@ struct PlayerBar: View { // swiftlint:disable:this type_body_length
         HStack(spacing: 8) {
             self.thumbnailView
 
-            if !usesCompactDetails {
+            if usesCompactDetails {
+                PlayerBarIconButton(
+                    action: self.openFullScreenPlayer,
+                    accessibilityID: AccessibilityID.PlayerBar.nowPlayingButton,
+                    accessibilityLabel: String(localized: "Now Playing")
+                ) {
+                    Image(systemName: "arrow.up.left.and.arrow.down.right")
+                        .font(.system(size: 14))
+                }
+                .disabled(self.playerService.currentTrack == nil)
+            } else {
                 self.songDetailsView
                     .frame(width: 110, alignment: .leading)
             }
@@ -218,17 +228,14 @@ struct PlayerBar: View { // swiftlint:disable:this type_body_length
             .overlay {
                 // The marquee is AppKit-hosted and the bar's interactive glass swallows plain
                 // tap gestures, so a transparent Button takes the click.
-                Button {
-                    guard self.playerService.currentTrack != nil else { return }
-                    HapticService.toggle()
-                    withAnimation(AppAnimation.standard) {
-                        self.playerService.showFullScreenPlayer = true
-                    }
-                } label: {
+                Button(action: self.openFullScreenPlayer) {
                     Color.clear
                         .contentShape(.rect)
                 }
                 .buttonStyle(.plain)
+                .disabled(self.playerService.currentTrack == nil)
+                .accessibilityLabel(String(localized: "Now Playing"))
+                .help(String(localized: "Now Playing"))
             }
             .accessibilityIdentifier(AccessibilityID.PlayerBar.trackTitle)
 
@@ -770,6 +777,14 @@ struct PlayerBar: View { // swiftlint:disable:this type_body_length
     }
 
     // MARK: - Actions
+
+    private func openFullScreenPlayer() {
+        guard self.playerService.currentTrack != nil else { return }
+        HapticService.toggle()
+        withAnimation(AppAnimation.standard) {
+            self.playerService.showFullScreenPlayer = true
+        }
+    }
 
     /// Whether the context menu offers the track's artist: not when the player bar can't navigate
     /// or that artist's page is already showing.
