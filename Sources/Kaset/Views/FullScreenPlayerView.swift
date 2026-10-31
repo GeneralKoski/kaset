@@ -220,7 +220,9 @@ struct FullScreenPlayerView: View {
                 label: String(localized: "Shuffle"),
                 accessibilityValue: Self.shuffleAccessibilityValue(for: self.playerService.shuffleMode)
             ) {
-                self.playerService.toggleShuffle()
+                // Same cycle as the player bar, so Smart Shuffle stays reachable here.
+                HapticService.toggle()
+                self.playerService.cycleShuffleMode()
             }
 
             Spacer(minLength: 8)
