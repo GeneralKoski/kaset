@@ -39,6 +39,8 @@ swiftlint --strict && swiftformat .
 
 Default local workflow is CLI-first: use the commands above for day-to-day verification, and escalate to Xcode/`xcodebuild` only for simulator, UI, or runtime debugging, screenshots, or scheme-specific investigation.
 
+> ⚠️ **SwiftFormat version**: CI pins SwiftFormat 0.63.1 (`.github/workflows/lint.yml`). Newer releases add rules that rewrite unrelated files, so format with the pinned version and bump the pin in its own change.
+
 > ⚠️ **SwiftFormat `--self insert` rule**: The project uses `--self insert` in `.swiftformat`. In static methods, call other static methods with `Self.methodName()` (not bare `methodName()`); in instance methods, use `self.property` explicitly.
 
 ## Localization
