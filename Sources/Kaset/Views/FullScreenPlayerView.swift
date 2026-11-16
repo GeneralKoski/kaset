@@ -219,6 +219,7 @@ struct FullScreenPlayerView: View {
                 isActive: self.playerService.shuffleEnabled,
                 // Same marker as the player bar, so Smart Shuffle is told apart from plain shuffle.
                 badgeSystemName: self.playerService.shuffleMode == .smart ? "sparkles" : nil,
+                isDimmed: self.playerService.isApplyingSmartShuffle,
                 label: String(localized: "Shuffle"),
                 accessibilityValue: Self.shuffleAccessibilityValue(for: self.playerService.shuffleMode)
             ) {
@@ -226,7 +227,6 @@ struct FullScreenPlayerView: View {
                 HapticService.toggle()
                 self.playerService.cycleShuffleMode()
             }
-            .opacity(self.playerService.isApplyingSmartShuffle ? 0.5 : 1)
 
             Spacer(minLength: 8)
 
@@ -351,6 +351,7 @@ struct FullScreenPlayerView: View {
         size: CGFloat,
         isActive: Bool = false,
         badgeSystemName: String? = nil,
+        isDimmed: Bool = false,
         label: String,
         accessibilityValue: String = "",
         action: @escaping () -> Void
@@ -367,6 +368,7 @@ struct FullScreenPlayerView: View {
                             .offset(x: 6, y: -5)
                     }
                 }
+                .opacity(isDimmed ? 0.5 : 1)
                 .frame(minWidth: 36, minHeight: 40)
                 .contentShape(.rect)
         }
