@@ -826,6 +826,7 @@ final class PlayerService: NSObject, PlayerServiceProtocol {
         SingletonPlayerWebView.shared.cancelQueueInjection()
         self.injectedWebQueueVideoId = nil
         self.pendingWebQueueInjectionVideoId = nil
+        self.webQueueInjectionRetries = nil
     }
 
     /// Records the current index before `next()` moves to `newIndex` (no-op if unchanged).
@@ -943,8 +944,8 @@ final class PlayerService: NSObject, PlayerServiceProtocol {
     /// or a new playback context supersedes it.
     var webQueueInjectionGeneration: Int = 0
 
-    /// Retries left for injecting a target whose source was not yet in YouTube Music's queue.
-    @ObservationIgnored var webQueueInjectionRetries: (videoId: String, remaining: Int)?
+    /// Retries left for injecting a target after a source that was not yet in YouTube Music's queue.
+    @ObservationIgnored var webQueueInjectionRetries: (pair: (videoId: String, sourceVideoId: String?), remaining: Int)?
 
     /// Video ID that Kaset just selected through deterministic queue navigation.
     /// WebView metadata can arrive out of order around manual/media-key skips; keep
