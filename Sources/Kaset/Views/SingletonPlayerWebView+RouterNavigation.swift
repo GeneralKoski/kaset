@@ -147,7 +147,9 @@ extension SingletonPlayerWebView {
                 && typeof video.addEventListener === 'function') {
                 const cleanStart = { finish: finishCleanStart };
                 window.__kasetCleanStart = cleanStart;
-                const cleanStartDeadline = setTimeout(finishCleanStart, 4000);
+                const cleanStartBegan = performance.now();
+                let cleanStartDeadline = setTimeout(rewindAtDeadline, 4000);
+                let isRewinding = false;
                 // YouTube re-applies its own mute state while loading the track. Hold the
                 // element muted and report the requested state back, so its UI is unaffected.
                 let requestedMuted = false;
@@ -158,6 +160,21 @@ extension SingletonPlayerWebView {
                 });
                 mutedDescriptor.set.call(video, true);
 
+                // Playback that began after this navigation cannot be further along than the
+                // time elapsed since. A later position was set on purpose (e.g. restored).
+                function startedAfterNavigation() {
+                    const elapsed = (performance.now() - cleanStartBegan) / 1000;
+                    return video.currentTime <= elapsed * Math.max(video.playbackRate || 1, 1) + 0.5;
+                }
+
+                function rewind() {
+                    isRewinding = true;
+                    video.removeEventListener('timeupdate', rewindOnceAudible);
+                    // Unmute only once the seek lands, or the pre-seek position leaks through.
+                    video.addEventListener('seeked', finishCleanStart, { once: true });
+                    video.currentTime = 0;
+                }
+
                 function rewindOnceAudible() {
                     if (window.__kasetCleanStart !== cleanStart) return;
                     let currentId = null;
@@ -166,15 +183,27 @@ extension SingletonPlayerWebView {
                         currentId = data && (data.video_id || data.videoId);
                     } catch (_) {}
                     if (currentId !== videoId || isAdShowing() || video.currentTime < 0.25) return;
-                    // A later position means playback was moved on purpose (e.g. restored).
-                    if (video.currentTime > 1.5) {
+                    if (!startedAfterNavigation()) {
                         finishCleanStart();
                         return;
                     }
-                    video.removeEventListener('timeupdate', rewindOnceAudible);
-                    // Unmute only once the seek lands, or the pre-seek position leaks through.
-                    video.addEventListener('seeked', finishCleanStart, { once: true });
-                    video.currentTime = 0;
+                    // The target can be recognised seconds late: rewinding by elapsed time,
+                    // not by a fixed position, keeps it from being unmuted mid-track.
+                    rewind();
+                }
+
+                // The target was never recognised: YouTube Music can play a counterpart of
+                // the requested track under another id. Whatever started since the navigation
+                // has played muted, so it is rewound too instead of being unmuted mid-track.
+                function rewindAtDeadline() {
+                    if (window.__kasetCleanStart !== cleanStart) return;
+                    if (isRewinding || video.paused || isAdShowing()
+                        || video.currentTime < 0.25 || !startedAfterNavigation()) {
+                        finishCleanStart();
+                        return;
+                    }
+                    rewind();
+                    cleanStartDeadline = setTimeout(finishCleanStart, 1000);
                 }
 
                 function finishCleanStart() {

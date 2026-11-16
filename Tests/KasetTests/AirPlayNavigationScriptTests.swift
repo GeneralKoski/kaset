@@ -408,26 +408,7 @@ struct AirPlayNavigationScriptTests {
 
     @Test("A clean start rewinds the audible target while muted, then restores the requested mute state", arguments: [false, true])
     func cleanStartRewindsWhileMuted(requestedMuted: Bool) throws {
-        let context = try Self.makeContext(setup: """
-        function HTMLMediaElement() {}
-        Object.defineProperty(HTMLMediaElement.prototype, 'muted', {
-            configurable: true,
-            get() { return !!this.nativeMuted; },
-            set(value) { this.nativeMuted = !!value; }
-        });
-        var mediaListeners = [];
-        video = Object.assign(Object.create(HTMLMediaElement.prototype), video, {
-            currentTime: 0,
-            addEventListener: (type, handler) => mediaListeners.push({ type: type, handler: handler }),
-            removeEventListener: (type, handler) => {
-                mediaListeners = mediaListeners.filter(value => value.type !== type || value.handler !== handler);
-            }
-        });
-        originalVideo = video;
-        function dispatchMedia(type) {
-            mediaListeners.filter(value => value.type === type).forEach(value => value.handler());
-        }
-        """)
+        let context = try Self.makeContext(setup: Self.cleanStartMediaSetup)
         Self.navigate(to: "target", generation: 1, in: context)
         Self.evaluate("video.muted = \(requestedMuted); video.currentTime = 0.5; dispatchMedia('timeupdate');", in: context)
 
@@ -442,6 +423,88 @@ struct AirPlayNavigationScriptTests {
         #expect(context.evaluateScript("window.__kasetCleanStart === null")?.toBool() == true)
         #expect(context.evaluateScript("mediaListeners.length")?.toInt32() == 0)
     }
+
+    @Test("A target recognised late is rewound instead of being unmuted mid-track")
+    func cleanStartRewindsLateRecognisedTarget() throws {
+        let context = try Self.makeContext(setup: Self.cleanStartMediaSetup)
+        Self.navigate(to: "target", generation: 1, in: context)
+        // The media already plays the target while the player API still reports the old track.
+        Self.evaluate("""
+        video.readyState = 4; playerState = 1; currentVideoId = 'source';
+        advance(3000); video.currentTime = 2.6; dispatchMedia('timeupdate');
+        """, in: context)
+        #expect(context.evaluateScript("video.nativeMuted")?.toBool() == true)
+
+        Self.evaluate("currentVideoId = 'target'; video.currentTime = 2.8; dispatchMedia('timeupdate');", in: context)
+
+        #expect(context.evaluateScript("video.currentTime")?.toDouble() == 0)
+        #expect(context.evaluateScript("video.nativeMuted")?.toBool() == true)
+
+        Self.evaluate("dispatchMedia('seeked');", in: context)
+
+        #expect(context.evaluateScript("video.nativeMuted")?.toBool() == false)
+        #expect(context.evaluateScript("window.__kasetCleanStart === null")?.toBool() == true)
+    }
+
+    @Test("A track that never reports the target id is rewound at the deadline", arguments: [true, false])
+    func cleanStartDeadlineRewindsUnrecognisedTrack(seekLands: Bool) throws {
+        let context = try Self.makeContext(setup: Self.cleanStartMediaSetup)
+        Self.navigate(to: "target", generation: 1, in: context)
+        // YouTube Music can play a counterpart of the requested track under another id.
+        Self.evaluate("""
+        video.readyState = 4; playerState = 1; currentVideoId = 'counterpart';
+        video.currentTime = 3.2; advance(4000);
+        """, in: context)
+
+        #expect(context.evaluateScript("video.currentTime")?.toDouble() == 0)
+        #expect(context.evaluateScript("video.nativeMuted")?.toBool() == true)
+
+        // A seek that never lands must not leave the track muted.
+        Self.evaluate(seekLands ? "dispatchMedia('seeked');" : "advance(1000);", in: context)
+
+        #expect(context.evaluateScript("video.nativeMuted")?.toBool() == false)
+        #expect(context.evaluateScript("Object.getOwnPropertyDescriptor(video, 'muted') === undefined")?.toBool() == true)
+        #expect(context.evaluateScript("window.__kasetCleanStart === null")?.toBool() == true)
+        #expect(context.evaluateScript("mediaListeners.length")?.toInt32() == 0)
+    }
+
+    @Test("A clean start leaves a deliberately positioned track alone", arguments: [
+        "advance(1000); video.currentTime = 95; dispatchMedia('timeupdate');",
+        "currentVideoId = 'counterpart'; video.currentTime = 95; advance(4000);",
+        "currentVideoId = 'counterpart'; video.paused = true; video.currentTime = 2; advance(4000);",
+    ])
+    func cleanStartKeepsDeliberatePosition(playback: String) throws {
+        let context = try Self.makeContext(setup: Self.cleanStartMediaSetup)
+        Self.navigate(to: "target", generation: 1, in: context)
+        Self.evaluate("video.readyState = 4; playerState = 1; \(playback)", in: context)
+
+        #expect(context.evaluateScript("video.currentTime")?.toDouble() != 0)
+        #expect(context.evaluateScript("video.nativeMuted")?.toBool() == false)
+        #expect(context.evaluateScript("window.__kasetCleanStart === null")?.toBool() == true)
+        #expect(context.evaluateScript("mediaListeners.length")?.toInt32() == 0)
+    }
+
+    /// A media element whose `muted` goes through `HTMLMediaElement.prototype`, as the clean start expects.
+    private static let cleanStartMediaSetup = """
+    function HTMLMediaElement() {}
+    Object.defineProperty(HTMLMediaElement.prototype, 'muted', {
+        configurable: true,
+        get() { return !!this.nativeMuted; },
+        set(value) { this.nativeMuted = !!value; }
+    });
+    var mediaListeners = [];
+    video = Object.assign(Object.create(HTMLMediaElement.prototype), video, {
+        currentTime: 0,
+        addEventListener: (type, handler) => mediaListeners.push({ type: type, handler: handler }),
+        removeEventListener: (type, handler) => {
+            mediaListeners = mediaListeners.filter(value => value.type !== type || value.handler !== handler);
+        }
+    });
+    originalVideo = video;
+    function dispatchMedia(type) {
+        mediaListeners.filter(value => value.type === type).forEach(value => value.handler());
+    }
+    """
 
     private static func makeContext(setup: String = "") throws -> JSContext {
         let context = try #require(JSContext())
